@@ -1,0 +1,32 @@
+# Set variables for virtual machine configurations
+$vmConfigs = @()
+$vmConfigs += New-AzVMConfig -VMSize "Standard_DS1_v2" -OsType Windows
+$vmConfigs += New-AzVMConfig -VMSize "Standard_DS1_v2" -OsType Windows
+$vmConfigs += New-AzVMConfig -VMSize "Standard_DS1_v2" -OsType Windows
+$vmConfigs += New-AzVMConfig -VMSize "Standard_DS1_v2" -OsType Linux
+
+# Set credentials for virtual machines
+$adminUsername = "dummyadmin"
+$adminPassword = ConvertTo-SecureString "P@ssw0rd1234" -AsPlainText -Force
+$adminCreds = New-Object System.Management.Automation.PSCredential ($adminUsername, $adminPassword)
+
+# Create resource group and virtual network
+$rgName = "Space"
+$location = "East US"
+New-AzResourceGroup -Name $rgName -Location $location
+$subnet = New-AzVirtualNetworkSubnetConfig -Name "Space_Subnet1" -AddressPrefix 10.0.0.0/24
+$vnet = New-AzVirtualNetwork -Name "VNet1" -ResourceGroupName $rgName -Location $location -AddressPrefix 10.0.0.0/16 -Subnet $subnet
+
+# Create domain controller
+$dcConfig = $vmConfigs[0] | Set-AzVMOperatingSystem -Credential $adminCreds -ComputerName "earth" | Set-AzVMSourceImage -PublisherName "MicrosoftWindowsServer" -Offer "WindowsServer" -Skus "2019-Datacenter" -Version latest
+$dcNIC = New-AzNetworkInterface -Name "dc01nic1" -ResourceGroupName $rgName -Location $location -SubnetId $vnet.Subnets[0].Id -PrivateIpAddress "10.0.0.4"
+$dcVM = New-AzVM -ResourceGroupName $rgName -Name "dc01" -Location $location -VirtualNetworkName $vnet.Name -SubnetName $vnet.Subnets[0].Name -NetworkInterfaceName $dcNIC.Name -VM $dcConfig
+
+# Create member server
+$memberConfig = $vmConfigs[1] | Set-AzVMOperatingSystem -Credential $adminCreds -ComputerName "water" | Set-AzVMSourceImage -PublisherName "MicrosoftWindowsServer" -Offer "WindowsServer" -Skus "2019-Datacenter" -Version latest
+$memberNIC = New-AzNetworkInterface -Name "srv01nic1" -ResourceGroupName $rgName -Location $location -SubnetId $vnet.Subnets[0].Id -PrivateIpAddress "10.0.0.5"
+$memberVM = New-AzVM -ResourceGroupName $rgName -Name "srv01" -Location $location -VirtualNetworkName $vnet.Name -SubnetName $vnet.Subnets[0].Name -NetworkInterfaceName $memberNIC.Name -VM $memberConfig
+
+# Create Windows 10 client
+$clientConfig = $vmConfigs[2] | Set-AzVMOperatingSystem -Credential $adminCreds -ComputerName "fire" | Set-AzVMSourceImage -PublisherName "MicrosoftWindowsDesktop" -Offer "Windows-10" -Skus "20h2-pro" -Version latest
+$clientNIC = New-AzNetworkInterface -Name "win10nic1" -ResourceGroupName $rgName -
